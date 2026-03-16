@@ -1,0 +1,4 @@
+id,patient_name,age,sex,phone,complaint,diagnosis,created_at
+550e8400-e29b-41d4-a716-446655440000,Budi Santoso,45,Laki-laki,08123456789,Nyeri punggung bawah menjalar ke kaki,"{""pattern"": ""Kidney Yang Deficiency"", ""points"": [""BL23"", ""GV4""]}","2026-03-16T15:52:44Z"
+660e8400-e29b-41d4-a716-446655440001,Siti Aminah,32,Perempuan,08567890123,Sakit kepala berdenyut dan pusing,"{""pattern"": ""Liver Yang Rising"", ""points"": [""LR3"", ""GB20""]}","2026-03-16T15:53:00Z"
+770e8400-e29b-41d4-a716-446655440002,Andi Wijaya,28,Laki-laki,08771234567,Batuk kering dan tenggorokan gatal,"{""pattern"": ""Lung Yin Deficiency"", ""points"": [""LU7"", ""KI6""]}","2026-03-16T15:54:10Z"

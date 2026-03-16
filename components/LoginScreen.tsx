@@ -45,9 +45,15 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
       });
 
       onLoginSuccess(userAccount);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google login error:", error);
-      setError('Gagal login dengan Google.');
+      if (error.code === 'auth/unauthorized-domain') {
+        setError('Domain ini belum diizinkan di Firebase Console. Tambahkan domain Netlify Anda ke "Authorized Domains".');
+      } else if (error.code === 'auth/popup-blocked') {
+        setError('Popup diblokir oleh browser. Izinkan popup untuk login.');
+      } else {
+        setError(`Gagal login dengan Google: ${error.message || 'Error tidak diketahui'}`);
+      }
     }
   };
 

@@ -1,7 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { FileText, Download, Plus, Trash2, Printer, Calculator } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { FileText, Download, Plus, Trash2, Printer, Calculator, User, Building2, Search } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { db } from '../services/db';
+import { SavedPatient } from '../types';
 
 interface InvoiceItem {
   id: string;
@@ -15,13 +17,29 @@ export const InvoiceGeneratorPanel: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [clientName, setClientName] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  const [clinicName, setClinicName] = useState('TCM PRO');
+  const [clinicAddress, setClinicAddress] = useState('Jl. Kesehatan No. 123, Jakarta');
+  const [clinicPhone, setClinicPhone] = useState('+62 812 3456 7890');
+  
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: Date.now().toString(), description: 'TCM Consultation & Treatment', quantity: 1, unitPrice: 0 }
   ]);
   const [notes, setNotes] = useState('Thank you for your business!');
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  const [patients, setPatients] = useState<SavedPatient[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showPatientList, setShowPatientList] = useState(false);
 
   const invoiceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchPatients = async () => {
+      const data = await db.patients.getAll();
+      setPatients(data);
+    };
+    fetchPatients();
+  }, []);
 
   const addItem = () => {
     setItems([...items, { id: Date.now().toString(), description: '', quantity: 1, unitPrice: 0 }]);
@@ -48,6 +66,13 @@ export const InvoiceGeneratorPanel: React.FC = () => {
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
+  };
+
+  const handleSelectPatient = (patient: SavedPatient) => {
+    setClientName(patient.patientName);
+    setClientAddress(`${patient.address || ''}\nAge: ${patient.age}, Sex: ${patient.sex}`);
+    setShowPatientList(false);
+    setSearchQuery('');
   };
 
   const handleDownloadPDF = async () => {
@@ -106,6 +131,10 @@ export const InvoiceGeneratorPanel: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const filteredPatients = patients.filter(p => 
+    p.patientName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="h-full flex flex-col md:flex-row bg-purple-50 overflow-hidden animate-fade-in font-sans">
       {/* Input Form Panel */}
@@ -123,8 +152,83 @@ export const InvoiceGeneratorPanel: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Clinic Details */}
           <div className="space-y-4">
-            <h3 className="text-sm font-black text-purple-800 uppercase tracking-widest border-b border-purple-100 pb-2">Invoice Details</h3>
+            <h3 className="text-sm font-black text-purple-800 uppercase tracking-widest border-b border-purple-100 pb-2 flex items-center gap-2">
+              <Building2 className="w-4 h-4" /> Clinic Details
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Clinic Name</label>
+                <input 
+                  type="text" 
+                  value={clinicName} 
+                  onChange={e => setClinicName(e.target.value)}
+                  className="w-full bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 focus:border-purple-400 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Clinic Address</label>
+                <input 
+                  type="text" 
+                  value={clinicAddress} 
+                  onChange={e => clinicAddress(e.target.value)}
+                  className="w-full bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 focus:border-purple-400 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Clinic Phone</label>
+                <input 
+                  type="text" 
+                  value={clinicPhone} 
+                  onChange={e => setClinicPhone(e.target.value)}
+                  className="w-full bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 focus:border-purple-400 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-purple-100 pb-2">
+              <h3 className="text-sm font-black text-purple-800 uppercase tracking-widest flex items-center gap-2">
+                <User className="w-4 h-4" /> Client Details
+              </h3>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowPatientList(!showPatientList)}
+                  className="text-xs font-bold text-purple-600 bg-purple-100 hover:bg-purple-200 px-3 py-1 rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <Search className="w-3 h-3" /> Select Patient
+                </button>
+                
+                {showPatientList && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white border border-purple-100 rounded-2xl shadow-2xl z-50 p-2 max-h-64 overflow-y-auto">
+                    <input 
+                      autoFocus
+                      type="text"
+                      placeholder="Search patient..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="w-full bg-purple-50 border border-purple-100 rounded-xl px-3 py-2 text-xs mb-2 outline-none focus:border-purple-300"
+                    />
+                    <div className="space-y-1">
+                      {filteredPatients.length > 0 ? filteredPatients.map(p => (
+                        <button 
+                          key={p.id}
+                          onClick={() => handleSelectPatient(p)}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-purple-50 rounded-lg transition-colors font-bold text-purple-900 border-b border-purple-50 last:border-0"
+                        >
+                          {p.patientName}
+                        </button>
+                      )) : (
+                        <p className="text-[10px] text-center py-4 text-purple-400 font-bold uppercase">No patients found</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Invoice Number</label>
@@ -283,13 +387,13 @@ export const InvoiceGeneratorPanel: React.FC = () => {
             <div className="text-right">
               <div className="flex items-center justify-end gap-2 mb-2">
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-black text-xl">T</span>
+                  <span className="text-white font-black text-xl">{clinicName.charAt(0)}</span>
                 </div>
-                <h2 className="text-xl font-black text-purple-900 tracking-tighter">TCM PRO</h2>
+                <h2 className="text-xl font-black text-purple-900 tracking-tighter">{clinicName}</h2>
               </div>
               <p className="text-xs text-purple-500">Traditional Chinese Medicine Clinic</p>
-              <p className="text-xs text-purple-500">Jl. Kesehatan No. 123, Jakarta</p>
-              <p className="text-xs text-purple-500">Tel: +62 812 3456 7890</p>
+              <p className="text-xs text-purple-500">{clinicAddress}</p>
+              <p className="text-xs text-purple-500">Tel: {clinicPhone}</p>
             </div>
           </div>
 
@@ -345,7 +449,7 @@ export const InvoiceGeneratorPanel: React.FC = () => {
           )}
           
           <div className="mt-16 text-center text-[10px] text-purple-400 font-bold uppercase tracking-widest">
-            Generated by TCM PRO System
+            Generated by {clinicName} System
           </div>
         </div>
       </div>

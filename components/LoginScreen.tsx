@@ -4,7 +4,7 @@ import { Lock, User, LogIn, Database, Zap, Chrome } from 'lucide-react';
 import { login } from '../services/authService';
 import { UserAccount } from '../types';
 import { DEFAULT_ADMIN } from '../services/db';
-import { auth, googleProvider, signInWithPopup } from '../firebase';
+import { auth, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from '../firebase';
 import { db } from '../services/db';
 
 interface Props {
@@ -12,15 +12,61 @@ interface Props {
 }
 
 const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = await login(username, password);
-    if (user) onLoginSuccess(user);
-    else setError('Username atau password salah.');
+    if (!email || !password) {
+      setError('Email dan password wajib diisi.');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      let user;
+      if (isRegistering) {
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        user = result.user;
+      } else {
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        user = result.user;
+      }
+
+      const userAccount: UserAccount = {
+        username: user.email?.split('@')[0] || 'User',
+        password: '',
+        role: 'user',
+        createdAt: Date.now()
+      };
+
+      await db.users.add({
+        ...userAccount,
+        uid: user.uid
+      });
+
+      onLoginSuccess(userAccount);
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        setError('Email atau password salah.');
+      } else if (error.code === 'auth/email-already-in-use') {
+        setError('Email sudah terdaftar. Silakan login.');
+      } else if (error.code === 'auth/weak-password') {
+        setError('Password terlalu lemah (min. 6 karakter).');
+      } else if (error.code === 'auth/invalid-email') {
+        setError('Format email tidak valid.');
+      } else {
+        setError(`Gagal: ${error.message}`);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleQuickAccess = () => {
@@ -73,13 +119,14 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
           <p className="text-purple-500 text-xs font-bold uppercase tracking-widest mt-1">Clinical Decision Support System</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleEmailAuth} className="space-y-4">
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
             <input 
-              type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-purple-50/50 border border-purple-200 rounded-2xl py-4 pl-12 pr-4 text-purple-950 focus:border-tcm-primary focus:bg-white outline-none transition-all"
-              placeholder="Username"
+              placeholder="Email Klinik"
+              required
             />
           </div>
           <div className="relative">
@@ -88,12 +135,25 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
               type="password" value={password} onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-purple-50/50 border border-purple-200 rounded-2xl py-4 pl-12 pr-4 text-purple-950 focus:border-tcm-primary focus:bg-white outline-none transition-all"
               placeholder="Password"
+              required
             />
           </div>
           {error && <p className="text-rose-500 text-xs font-bold text-center">{error}</p>}
           
-          <button type="submit" className="w-full bg-tcm-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-purple-900/20 hover:brightness-110 active:scale-95 transition-all">
-             MASUK SISTEM
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="w-full bg-tcm-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-purple-900/20 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
+          >
+             {isLoading ? 'MEMPROSES...' : isRegistering ? 'DAFTAR AKUN BARU' : 'MASUK SISTEM'}
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => setIsRegistering(!isRegistering)}
+            className="w-full text-[10px] font-black text-purple-400 uppercase tracking-widest hover:text-purple-600 transition-colors"
+          >
+            {isRegistering ? 'Sudah punya akun? Login di sini' : 'Belum punya akun? Daftar di sini'}
           </button>
         </form>
 
@@ -110,7 +170,14 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
            >
               <Zap className="w-5 h-5 group-hover:animate-bounce" /> AKSES CEPAT (ADMIN LOKAL)
            </button>
-           <p className="text-[10px] text-purple-400 text-center mt-4 uppercase font-black tracking-widest">Login Google diperlukan untuk sinkronisasi antar perangkat.</p>
+           <div className="mt-4 space-y-2">
+             <p className="text-[10px] text-purple-400 text-center uppercase font-black tracking-widest leading-relaxed">
+               Login Google diperlukan untuk sinkronisasi antar perangkat dan menyimpan API Key ke Cloud.
+             </p>
+             <p className="text-[9px] text-amber-600 text-center font-bold leading-relaxed px-4">
+               PENTING: Akses Cepat tidak dapat menyimpan API Key secara permanen. Jika Anda ingin menyimpan API Key, harap Login dengan Google.
+             </p>
+           </div>
         </div>
       </div>
     </div>

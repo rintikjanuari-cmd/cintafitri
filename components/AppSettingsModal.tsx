@@ -30,10 +30,15 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
   useEffect(() => {
     if (isOpen) {
       const fetchSettings = async () => {
-        const settings = await db.settings.get();
-        if (settings) {
-          setGeminiKeys(settings.geminiApiKeys || []);
-          setSupabaseConfigs(settings.supabaseConfigs || []);
+        try {
+          const settings = await db.settings.get();
+          if (settings) {
+            setGeminiKeys(settings.geminiApiKeys || []);
+            setSupabaseConfigs(settings.supabaseConfigs || []);
+          }
+        } catch (error: any) {
+          console.error("Error fetching settings:", error);
+          setStatus({ type: 'error', message: 'Gagal mengambil pengaturan. Pastikan Anda sudah login dengan Google.' });
         }
       };
       fetchSettings();
@@ -44,16 +49,22 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
   const handleSaveSettings = async () => {
     setIsLoading(true);
     setStatus(null);
-    const success = await db.settings.save({
-      geminiApiKeys: geminiKeys,
-      supabaseConfigs: supabaseConfigs,
-      updatedAt: Date.now()
-    });
-    setIsLoading(false);
-    if (success) {
-      setStatus({ type: 'success', message: 'Pengaturan berhasil disimpan.' });
-    } else {
-      setStatus({ type: 'error', message: 'Gagal menyimpan pengaturan.' });
+    try {
+      const success = await db.settings.save({
+        geminiApiKeys: geminiKeys,
+        supabaseConfigs: supabaseConfigs,
+        updatedAt: Date.now()
+      });
+      if (success) {
+        setStatus({ type: 'success', message: 'Pengaturan berhasil disimpan.' });
+      } else {
+        setStatus({ type: 'error', message: 'Gagal menyimpan pengaturan.' });
+      }
+    } catch (error: any) {
+      console.error("Error saving settings:", error);
+      setStatus({ type: 'error', message: 'Gagal menyimpan pengaturan. Pastikan Anda memiliki izin (Login Google diperlukan).' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -231,6 +242,19 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
         </div>
 
         <div className="p-6 space-y-8 max-h-[80vh] overflow-y-auto scrollbar-hide">
+          {!auth.currentUser && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-xs font-black text-amber-900 uppercase tracking-tight">Mode Akses Cepat Aktif</p>
+                <p className="text-[10px] text-amber-700 leading-relaxed font-bold">
+                  Anda tidak login dengan Google. Pengaturan API tidak dapat disimpan ke Cloud dan tidak akan muncul di perangkat lain. 
+                  Silakan login dengan Google untuk sinkronisasi data.
+                </p>
+              </div>
+            </div>
+          )}
+
           {status && (
             <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-bold ${
               status.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'

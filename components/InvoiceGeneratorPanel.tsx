@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FileText, Download, Plus, Trash2, Printer, Calculator, User, Building2, Search } from 'lucide-react';
+import { FileText, Download, Plus, Trash2, Printer, Calculator, User, Building2, Search, Loader2, Save } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { db } from '../services/db';
@@ -20,6 +20,7 @@ export const InvoiceGeneratorPanel: React.FC = () => {
   const [clinicName, setClinicName] = useState('TCM PRO');
   const [clinicAddress, setClinicAddress] = useState('Jl. Kesehatan No. 123, Jakarta');
   const [clinicPhone, setClinicPhone] = useState('+62 812 3456 7890');
+  const [isSaving, setIsSaving] = useState(false);
   
   const [items, setItems] = useState<InvoiceItem[]>([
     { id: Date.now().toString(), description: 'TCM Consultation & Treatment', quantity: 1, unitPrice: 0 }
@@ -34,12 +35,42 @@ export const InvoiceGeneratorPanel: React.FC = () => {
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchPatients = async () => {
-      const data = await db.patients.getAll();
-      setPatients(data);
+    const fetchInitialData = async () => {
+      const [patientsData, settings] = await Promise.all([
+        db.patients.getAll(),
+        db.settings.get()
+      ]);
+      setPatients(patientsData);
+      if (settings && settings.clinicDetails) {
+        setClinicName(settings.clinicDetails.name || 'TCM PRO');
+        setClinicAddress(settings.clinicDetails.address || 'Jl. Kesehatan No. 123, Jakarta');
+        setClinicPhone(settings.clinicDetails.phone || '+62 812 3456 7890');
+      }
     };
-    fetchPatients();
+    fetchInitialData();
   }, []);
+
+  const handleSaveClinicDetails = async () => {
+    setIsSaving(true);
+    try {
+      const currentSettings = await db.settings.get();
+      await db.settings.save({
+        ...(currentSettings || { geminiApiKeys: [], supabaseConfigs: [] }),
+        clinicDetails: {
+          name: clinicName,
+          address: clinicAddress,
+          phone: clinicPhone
+        },
+        updatedAt: Date.now()
+      });
+      alert("Clinic details saved as default.");
+    } catch (error) {
+      console.error("Error saving clinic details:", error);
+      alert("Failed to save clinic details.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const addItem = () => {
     setItems([...items, { id: Date.now().toString(), description: '', quantity: 1, unitPrice: 0 }]);
@@ -66,6 +97,13 @@ export const InvoiceGeneratorPanel: React.FC = () => {
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(amount);
+  };
+
+  const toTitleCase = (str: string) => {
+    return str.replace(
+      /\w\S*/g,
+      (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+    );
   };
 
   const handleSelectPatient = (patient: SavedPatient) => {
@@ -169,11 +207,11 @@ export const InvoiceGeneratorPanel: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Clinic Address</label>
-                <input 
-                  type="text" 
+                <textarea 
                   value={clinicAddress} 
-                  onChange={e => clinicAddress(e.target.value)}
-                  className="w-full bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 focus:border-purple-400 outline-none"
+                  onChange={e => setClinicAddress(e.target.value)}
+                  rows={2}
+                  className="w-full bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 focus:border-purple-400 outline-none resize-none"
                 />
               </div>
               <div>
@@ -185,6 +223,14 @@ export const InvoiceGeneratorPanel: React.FC = () => {
                   className="w-full bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 focus:border-purple-400 outline-none"
                 />
               </div>
+              <button 
+                onClick={handleSaveClinicDetails}
+                disabled={isSaving}
+                className="w-full py-2 bg-purple-100 text-purple-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                Save Clinic Details as Default
+              </button>
             </div>
           </div>
 
@@ -389,10 +435,10 @@ export const InvoiceGeneratorPanel: React.FC = () => {
                 <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-black text-xl">{clinicName.charAt(0)}</span>
                 </div>
-                <h2 className="text-xl font-black text-purple-900 tracking-tighter">{clinicName}</h2>
+                <h2 className="text-xl font-black text-purple-900 tracking-tighter">{toTitleCase(clinicName)}</h2>
               </div>
               <p className="text-xs text-purple-500">Traditional Chinese Medicine Clinic</p>
-              <p className="text-xs text-purple-500">{clinicAddress}</p>
+              <p className="text-xs text-purple-500 whitespace-pre-wrap">{toTitleCase(clinicAddress)}</p>
               <p className="text-xs text-purple-500">Tel: {clinicPhone}</p>
             </div>
           </div>

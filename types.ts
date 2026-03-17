@@ -43,9 +43,16 @@ export interface SupabaseConfig {
   lastError?: string;
 }
 
+export interface ClinicDetails {
+  name: string;
+  address: string;
+  phone: string;
+}
+
 export interface AppSettings {
   geminiApiKeys: GeminiKey[];
   supabaseConfigs: SupabaseConfig[];
+  clinicDetails?: ClinicDetails;
   updatedAt: number;
 }
 

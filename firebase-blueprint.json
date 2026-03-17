@@ -129,6 +129,14 @@
             }
           }
         },
+        "clinicDetails": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "address": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
         "updatedAt": {
           "type": "number"
         }

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Key, Lock, Save, Loader2, CheckCircle2, AlertCircle, Plus, Trash2, Database, Globe, RefreshCw, ClipboardList } from 'lucide-react';
+import { X, Key, Lock, Save, Loader2, CheckCircle2, AlertCircle, Plus, Trash2, Database, Globe, RefreshCw, ClipboardList, Building2 } from 'lucide-react';
 import { db } from '../services/db';
 import { auth } from '../firebase';
 import { changePassword } from '../services/authService';
@@ -12,12 +12,15 @@ import { supabaseExportService } from '../services/supabaseExportService';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: UserAccount;
+  currentUser: UserAccount | null;
 }
 
 const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => {
   const [geminiKeys, setGeminiKeys] = useState<GeminiKey[]>([]);
   const [supabaseConfigs, setSupabaseConfigs] = useState<SupabaseConfig[]>([]);
+  const [clinicName, setClinicName] = useState('TCM PRO');
+  const [clinicAddress, setClinicAddress] = useState('Jl. Kesehatan No. 123, Jakarta');
+  const [clinicPhone, setClinicPhone] = useState('+62 812 3456 7890');
   const [exportTableName, setExportTableName] = useState('patients');
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState('');
@@ -38,6 +41,11 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
           if (settings) {
             setGeminiKeys(settings.geminiApiKeys || []);
             setSupabaseConfigs(settings.supabaseConfigs || []);
+            if (settings.clinicDetails) {
+              setClinicName(settings.clinicDetails.name || 'TCM PRO');
+              setClinicAddress(settings.clinicDetails.address || 'Jl. Kesehatan No. 123, Jakarta');
+              setClinicPhone(settings.clinicDetails.phone || '+62 812 3456 7890');
+            }
           }
         } catch (error: any) {
           console.error("Error fetching settings:", error);
@@ -61,6 +69,11 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
       const success = await db.settings.save({
         geminiApiKeys: geminiKeys,
         supabaseConfigs: supabaseConfigs,
+        clinicDetails: {
+          name: clinicName,
+          address: clinicAddress,
+          phone: clinicPhone
+        },
         updatedAt: Date.now()
       });
       if (success) {
@@ -515,6 +528,47 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
               </p>
             </div>
           </section>
+          
+          <div className="h-px bg-purple-100" />
+
+          {/* Clinic Details Section */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-purple-950 font-black uppercase tracking-widest text-xs">
+              <Building2 className="w-4 h-4" /> Detail Klinik (Untuk Invoice)
+            </div>
+            <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Nama Klinik</label>
+                <input 
+                  type="text"
+                  value={clinicName}
+                  onChange={(e) => setClinicName(e.target.value)}
+                  className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all font-bold"
+                  placeholder="Contoh: TCM PRO Clinic"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Alamat Klinik</label>
+                <textarea 
+                  value={clinicAddress}
+                  onChange={(e) => setClinicAddress(e.target.value)}
+                  className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all resize-none"
+                  placeholder="Alamat lengkap klinik..."
+                  rows={2}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Nomor Telepon</label>
+                <input 
+                  type="text"
+                  value={clinicPhone}
+                  onChange={(e) => setClinicPhone(e.target.value)}
+                  className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
+                  placeholder="+62 ..."
+                />
+              </div>
+            </div>
+          </section>
 
           <button 
             onClick={handleSaveSettings}
@@ -528,46 +582,48 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
           <div className="h-px bg-purple-100" />
 
           {/* Password Section */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 text-purple-950 font-black uppercase tracking-widest text-xs">
-              <Lock className="w-4 h-4" /> Keamanan Akun
-            </div>
-            <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 space-y-4">
-              <p className="text-[10px] text-purple-400 font-bold leading-relaxed italic">
-                Gunakan formulir ini untuk mengubah password akun Anda. Password saat ini tidak ditampilkan demi keamanan.
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Password Baru</label>
-                  <input 
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
-                    placeholder="Min. 6 karakter"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Konfirmasi</label>
-                  <input 
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
-                    placeholder="Ulangi password"
-                  />
-                </div>
+          {currentUser && (
+            <section className="space-y-4">
+              <div className="flex items-center gap-2 text-purple-950 font-black uppercase tracking-widest text-xs">
+                <Lock className="w-4 h-4" /> Keamanan Akun
               </div>
-              <button 
-                onClick={handleChangePassword}
-                disabled={isLoading || !newPassword}
-                className="w-full bg-purple-950 text-white font-black py-4 rounded-2xl hover:bg-black active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
-                UBAH PASSWORD
-              </button>
-            </div>
-          </section>
+              <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 space-y-4">
+                <p className="text-[10px] text-purple-400 font-bold leading-relaxed italic">
+                  Gunakan formulir ini untuk mengubah password akun Anda. Password saat ini tidak ditampilkan demi keamanan.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Password Baru</label>
+                    <input 
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
+                      placeholder="Min. 6 karakter"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Konfirmasi</label>
+                    <input 
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
+                      placeholder="Ulangi password"
+                    />
+                  </div>
+                </div>
+                <button 
+                  onClick={handleChangePassword}
+                  disabled={isLoading || !newPassword}
+                  className="w-full bg-purple-950 text-white font-black py-4 rounded-2xl hover:bg-black active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Lock className="w-5 h-5" />}
+                  UBAH PASSWORD
+                </button>
+              </div>
+            </section>
+          )}
             </>
           )}
         </div>

@@ -19,15 +19,18 @@ interface Props {
 
 const DiagnosisCard: React.FC<Props> = ({ diagnosis, isPregnant, onShowVisualizer, patientContext }) => {
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   if (!diagnosis) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
     try {
-      db.patients.add({
+      await db.patients.add({
         id: Date.now().toString(),
         patientName: patientContext?.patientName || "Pasien Anonim",
         age: patientContext?.age || "-",
@@ -51,7 +54,9 @@ const DiagnosisCard: React.FC<Props> = ({ diagnosis, isPregnant, onShowVisualize
       setTimeout(() => setIsSaved(false), 3000);
     } catch (err) {
       console.error("Gagal menyimpan ke arsip:", err);
-      alert("Gagal menyimpan data ke database lokal.");
+      alert("Gagal menyimpan data ke database. Pastikan Anda sudah login.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -122,13 +127,22 @@ const DiagnosisCard: React.FC<Props> = ({ diagnosis, isPregnant, onShowVisualize
               <button 
                 onClick={handleSave} 
                 title="Simpan ke Arsip Pasien"
+                disabled={isSaving}
                 className={`p-3 rounded-xl border transition-all flex items-center gap-2 group ${
                   isSaved 
                   ? 'text-white border-emerald-500 bg-emerald-500 shadow-lg shadow-emerald-900/20' 
-                  : 'text-purple-500 border-purple-200 hover:text-tcm-primary hover:border-tcm-primary bg-purple-50'
+                  : isSaving
+                    ? 'text-purple-300 border-purple-100 bg-purple-50 cursor-wait'
+                    : 'text-purple-500 border-purple-200 hover:text-tcm-primary hover:border-tcm-primary bg-purple-50'
                 }`}
               >
-                {isSaved ? <><Check className="w-5 h-5" /><span className="text-[10px] font-black uppercase">Tersimpan!</span></> : <Save className="w-5 h-5 group-hover:scale-110" />}
+                {isSaved ? (
+                  <><Check className="w-5 h-5" /><span className="text-[10px] font-black uppercase">Tersimpan!</span></>
+                ) : isSaving ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5 group-hover:scale-110" />
+                )}
               </button>
               <button onClick={() => setShowNoteModal(true)} className="px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-fuchsia-900/20 transition-all active:scale-95">
                 <FileText className="w-4 h-4" /> Rx Note

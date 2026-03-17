@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Key, Lock, Save, Loader2, CheckCircle2, AlertCircle, Plus, Trash2, Database, Globe, RefreshCw, ClipboardList } from 'lucide-react';
 import { db } from '../services/db';
+import { auth } from '../firebase';
 import { changePassword } from '../services/authService';
 import { UserAccount, AppSettings, GeminiKey, SupabaseConfig } from '../types';
 import { GoogleGenAI } from "@google/genai";
@@ -25,11 +26,13 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       const fetchSettings = async () => {
+        setIsInitialLoading(true);
         try {
           const settings = await db.settings.get();
           if (settings) {
@@ -38,7 +41,12 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
           }
         } catch (error: any) {
           console.error("Error fetching settings:", error);
-          setStatus({ type: 'error', message: 'Gagal mengambil pengaturan. Pastikan Anda sudah login dengan Google.' });
+          const msg = !auth.currentUser 
+            ? 'Gagal mengambil pengaturan Cloud karena Anda tidak login. Gunakan Login Google atau Akun Klinik.' 
+            : 'Gagal mengambil pengaturan. Pastikan koneksi internet stabil.';
+          setStatus({ type: 'error', message: msg });
+        } finally {
+          setIsInitialLoading(false);
         }
       };
       fetchSettings();
@@ -62,7 +70,10 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
       }
     } catch (error: any) {
       console.error("Error saving settings:", error);
-      setStatus({ type: 'error', message: 'Gagal menyimpan pengaturan. Pastikan Anda memiliki izin (Login Google diperlukan).' });
+      const msg = !auth.currentUser 
+        ? 'Gagal menyimpan. Anda harus Login (Google/Akun Klinik) untuk menyimpan ke Cloud.' 
+        : 'Gagal menyimpan pengaturan. Pastikan Anda memiliki izin.';
+      setStatus({ type: 'error', message: msg });
     } finally {
       setIsLoading(false);
     }
@@ -215,15 +226,29 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
 
     setIsLoading(true);
     setStatus(null);
-    const result = await changePassword(currentUser.username, newPassword);
-    setIsLoading(false);
     
-    if (result.success) {
-      setStatus({ type: 'success', message: 'Password berhasil diubah.' });
+    try {
+      // If Firebase Auth user is present, use updatePassword
+      if (auth.currentUser) {
+        const { updatePassword } = await import('firebase/auth');
+        await updatePassword(auth.currentUser, newPassword);
+        setStatus({ type: 'success', message: 'Password Akun Cloud berhasil diubah.' });
+      } else {
+        // Fallback for local admin
+        const result = await changePassword(currentUser.username, newPassword);
+        if (result.success) {
+          setStatus({ type: 'success', message: 'Password Akun Lokal berhasil diubah.' });
+        } else {
+          throw new Error(result.message);
+        }
+      }
       setNewPassword('');
       setConfirmPassword('');
-    } else {
-      setStatus({ type: 'error', message: result.message });
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      setStatus({ type: 'error', message: `Gagal mengubah password: ${error.message}` });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -242,27 +267,34 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
         </div>
 
         <div className="p-6 space-y-8 max-h-[80vh] overflow-y-auto scrollbar-hide">
-          {!auth.currentUser && (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-xs font-black text-amber-900 uppercase tracking-tight">Mode Akses Cepat Aktif</p>
-                <p className="text-[10px] text-amber-700 leading-relaxed font-bold">
-                  Anda tidak login dengan Google. Pengaturan API tidak dapat disimpan ke Cloud dan tidak akan muncul di perangkat lain. 
-                  Silakan login dengan Google untuk sinkronisasi data.
-                </p>
-              </div>
+          {isInitialLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <Loader2 className="w-10 h-10 text-tcm-primary animate-spin" />
+              <p className="text-xs font-black text-purple-400 uppercase tracking-widest">Mengambil Pengaturan Cloud...</p>
             </div>
-          )}
+          ) : (
+            <>
+              {!auth.currentUser && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-black text-amber-900 uppercase tracking-tight">Mode Akses Cepat Aktif</p>
+                    <p className="text-[10px] text-amber-700 leading-relaxed font-bold">
+                      Anda tidak login. Pengaturan API tidak dapat disimpan ke Cloud dan tidak akan muncul di perangkat lain. 
+                      Silakan login untuk sinkronisasi data.
+                    </p>
+                  </div>
+                </div>
+              )}
 
-          {status && (
-            <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-bold ${
-              status.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'
-            }`}>
-              {status.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-              {status.message}
-            </div>
-          )}
+              {status && (
+                <div className={`p-4 rounded-2xl flex items-center gap-3 text-sm font-bold ${
+                  status.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-rose-50 text-rose-600 border border-rose-100'
+                }`}>
+                  {status.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                  {status.message}
+                </div>
+              )}
 
           {/* Gemini API Keys Section */}
           <section className="space-y-4">
@@ -500,7 +532,10 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
             <div className="flex items-center gap-2 text-purple-950 font-black uppercase tracking-widest text-xs">
               <Lock className="w-4 h-4" /> Keamanan Akun
             </div>
-            <div className="space-y-3">
+            <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100 space-y-4">
+              <p className="text-[10px] text-purple-400 font-bold leading-relaxed italic">
+                Gunakan formulir ini untuk mengubah password akun Anda. Password saat ini tidak ditampilkan demi keamanan.
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest ml-1">Password Baru</label>
@@ -508,7 +543,7 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-purple-50 border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
+                    className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
                     placeholder="Min. 6 karakter"
                   />
                 </div>
@@ -518,7 +553,7 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full bg-purple-50 border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
+                    className="w-full bg-white border border-purple-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tcm-primary transition-all"
                     placeholder="Ulangi password"
                   />
                 </div>
@@ -533,6 +568,8 @@ const AppSettingsModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) => 
               </button>
             </div>
           </section>
+            </>
+          )}
         </div>
 
         <div className="p-6 bg-purple-50/50 border-t border-purple-100 text-center">

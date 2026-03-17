@@ -130,23 +130,25 @@ export const db = {
   settings: {
     get: async (): Promise<AppSettings | null> => {
       try {
-        const docRef = doc(firestore, 'settings', 'global');
+        if (!auth.currentUser) return null;
+        const docRef = doc(firestore, 'settings', auth.currentUser.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           return docSnap.data() as AppSettings;
         }
         return null;
       } catch (e) {
-        handleFirestoreError(e, OperationType.GET, 'settings/global');
+        handleFirestoreError(e, OperationType.GET, `settings/${auth.currentUser?.uid}`);
         return null;
       }
     },
     save: async (settings: AppSettings): Promise<boolean> => {
       try {
-        await setDoc(doc(firestore, 'settings', 'global'), settings);
+        if (!auth.currentUser) return false;
+        await setDoc(doc(firestore, 'settings', auth.currentUser.uid), settings);
         return true;
       } catch (e) {
-        handleFirestoreError(e, OperationType.WRITE, 'settings/global');
+        handleFirestoreError(e, OperationType.WRITE, `settings/${auth.currentUser?.uid}`);
         return false;
       }
     }

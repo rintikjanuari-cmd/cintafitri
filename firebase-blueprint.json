@@ -144,9 +144,9 @@
       "schema": { "$ref": "#/entities/SavedPatient" },
       "description": "Stores patient records."
     },
-    "/settings/global": {
+    "/settings/{userId}": {
       "schema": { "$ref": "#/entities/AppSettings" },
-      "description": "Global application settings."
+      "description": "User-specific application settings."
     }
   }
 }

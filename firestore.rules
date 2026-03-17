@@ -142,8 +142,8 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
     }
 
-    match /settings/global {
-      allow read, write: if isAdmin();
+    match /settings/{userId} {
+      allow read, write: if isOwner(userId);
     }
   }
 }

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Trash2, Shield, User, AlertCircle, Save } from 'lucide-react';
+import { X, UserPlus, Trash2, Shield, User, AlertCircle, Save, Loader2 } from 'lucide-react';
 import { UserAccount } from '../types';
 import { db } from '../services/db';
 
@@ -15,6 +15,7 @@ const UserManagementModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) 
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRole, setNewRole] = useState<'admin' | 'user'>('user');
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -44,32 +45,39 @@ const UserManagementModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) 
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     setError('');
     setSuccessMsg('');
 
-    if (!newUsername.trim() || !newPassword.trim()) {
-      setError('Username and password are required.');
-      return;
-    }
+    try {
+      if (!newUsername.trim() || !newPassword.trim()) {
+        setError('Username and password are required.');
+        return;
+      }
 
-    const uid = Date.now().toString(); // Simple UID generation for local admin creation
-    const result = await db.users.add({
-      uid,
-      username: newUsername.trim(),
-      password: newPassword.trim(),
-      role: newRole,
-      createdAt: Date.now()
-    });
+      const uid = Date.now().toString(); // Simple UID generation for local admin creation
+      const result = await db.users.add({
+        uid,
+        username: newUsername.trim(),
+        password: newPassword.trim(),
+        role: newRole,
+        createdAt: Date.now()
+      });
 
-    if (result) {
-      setSuccessMsg(`User ${newUsername} added successfully.`);
-      setNewUsername('');
-      setNewPassword('');
-      setNewRole('user');
-      // Force refresh logic
-      setTimeout(() => refreshList(), 50);
-    } else {
-      setError("Failed to add user.");
+      if (result) {
+        setSuccessMsg(`User ${newUsername} added successfully.`);
+        setNewUsername('');
+        setNewPassword('');
+        setNewRole('user');
+        // Force refresh logic
+        setTimeout(() => refreshList(), 50);
+      } else {
+        setError("Failed to add user.");
+      }
+    } catch (err: any) {
+      setError(`Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -157,8 +165,13 @@ const UserManagementModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) 
                     </select>
                  </div>
                  <div className="md:col-span-1">
-                    <button type="submit" className="w-full bg-tcm-primary hover:brightness-110 active:scale-95 text-white font-black py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-purple-900/20">
-                       <Save className="w-4 h-4" /> Add
+                    <button 
+                      type="submit" 
+                      disabled={isLoading}
+                      className="w-full bg-tcm-primary hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-wait text-white font-black py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-purple-900/20"
+                    >
+                       {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 
+                       {isLoading ? 'Adding...' : 'Add'}
                     </button>
                  </div>
               </form>

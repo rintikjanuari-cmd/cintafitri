@@ -28,6 +28,14 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('tcm_active_session', JSON.stringify(currentUser));
+    } else if (isAuthReady) {
+      localStorage.removeItem('tcm_active_session');
+    }
+  }, [currentUser, isAuthReady]);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser({

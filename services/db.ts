@@ -84,6 +84,19 @@ export const db = {
         return false;
       }
     },
+    get: async (uid: string): Promise<UserAccount | null> => {
+      try {
+        const docSnap = await getDoc(doc(firestore, 'users', uid));
+        if (docSnap.exists()) {
+          return docSnap.data() as UserAccount;
+        }
+        return null;
+      } catch (e) {
+        // For login checks, we don't want to throw a big error if it's just a permission issue before login
+        console.warn('User fetch failed:', e);
+        return null;
+      }
+    },
     delete: async (uid: string): Promise<boolean> => {
       try {
         await deleteDoc(doc(firestore, 'users', uid));

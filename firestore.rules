@@ -103,7 +103,8 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated(); // Users can see other users (e.g. for admin assignment)
+      allow get: if true; // Allow checking if a user exists for clinic login
+      allow list: if isAuthenticated();
       
       // Allow create if authenticated, valid, uid matches, and user is not assigning themselves admin (unless they are already admin)
       allow create: if isOwner(userId) && 

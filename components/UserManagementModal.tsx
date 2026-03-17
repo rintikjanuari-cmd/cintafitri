@@ -55,7 +55,7 @@ const UserManagementModal: React.FC<Props> = ({ isOpen, onClose, currentUser }) 
         return;
       }
 
-      const uid = Date.now().toString(); // Simple UID generation for local admin creation
+      const uid = newUsername.trim(); // Use username as UID for clinic accounts
       const result = await db.users.add({
         uid,
         username: newUsername.trim(),

@@ -1,6 +1,6 @@
 
 import { UserAccount } from '../types';
-import { db } from './db';
+import { db, DEFAULT_ADMIN } from './db';
 
 // Ensure DB is initialized
 export const getUsers = async (): Promise<UserAccount[]> => {
@@ -38,9 +38,18 @@ export const deleteUser = async (username: string): Promise<{ success: boolean, 
 };
 
 export const login = async (username: string, password: string): Promise<UserAccount | null> => {
-  const users = await getUsers();
-  const user = users.find(u => u.username === username && u.password === password);
-  return user || null;
+  const user = await db.users.get(username);
+  if (user) {
+    if (user.password === password) return user;
+    return null;
+  }
+  
+  // Fallback for default admin if not in DB
+  if (username === DEFAULT_ADMIN.username && password === DEFAULT_ADMIN.password) {
+    return DEFAULT_ADMIN;
+  }
+  
+  return null;
 };
 
 export const changePassword = async (username: string, newPassword: string): Promise<{ success: boolean, message: string }> => {

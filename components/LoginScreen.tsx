@@ -18,6 +18,28 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [authMode, setAuthMode] = useState<'firebase' | 'clinic'>('firebase');
+  const [username, setUsername] = useState('');
+
+  const handleClinicLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const user = await login(username, password);
+      if (user) {
+        onLoginSuccess(user);
+      } else {
+        setError('Username atau password salah.');
+      }
+    } catch (err: any) {
+      setError(`Gagal login: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -94,7 +116,7 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
     } catch (error: any) {
       console.error("Google login error:", error);
       if (error.code === 'auth/unauthorized-domain') {
-        setError('Domain ini belum diizinkan di Firebase Console. Tambahkan domain Netlify Anda ke "Authorized Domains".');
+        setError('Domain ini belum diizinkan di Firebase Console. Tambahkan domain Cloud Run Anda ke "Authorized Domains".');
       } else if (error.code === 'auth/popup-blocked') {
         setError('Popup diblokir oleh browser. Izinkan popup untuk login.');
       } else {
@@ -110,8 +132,8 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-fuchsia-300 blur-[120px] rounded-full animate-pulse delay-1000"></div>
       </div>
 
-      <div className="bg-white/80 backdrop-blur-xl border border-purple-100 w-full max-w-md rounded-3xl shadow-2xl shadow-purple-200/50 p-8 relative z-10">
-        <div className="text-center mb-10">
+        <div className="bg-white/80 backdrop-blur-xl border border-purple-100 w-full max-w-md rounded-3xl shadow-2xl shadow-purple-200/50 p-8 relative z-10">
+        <div className="text-center mb-6">
           <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-purple-200">
              <Database className="w-8 h-8 text-tcm-primary" />
           </div>
@@ -119,16 +141,45 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
           <p className="text-purple-500 text-xs font-bold uppercase tracking-widest mt-1">Clinical Decision Support System</p>
         </div>
 
-        <form onSubmit={handleEmailAuth} className="space-y-4">
-          <div className="relative">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
-            <input 
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-purple-50/50 border border-purple-200 rounded-2xl py-4 pl-12 pr-4 text-purple-950 focus:border-tcm-primary focus:bg-white outline-none transition-all"
-              placeholder="Email Klinik"
-              required
-            />
-          </div>
+        {/* Auth Mode Toggle */}
+        <div className="flex bg-purple-50 p-1 rounded-2xl mb-8 border border-purple-100">
+          <button 
+            onClick={() => setAuthMode('firebase')}
+            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${authMode === 'firebase' ? 'bg-white text-tcm-primary shadow-sm' : 'text-purple-400 hover:text-purple-600'}`}
+          >
+            Google / Email
+          </button>
+          <button 
+            onClick={() => setAuthMode('clinic')}
+            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${authMode === 'clinic' ? 'bg-white text-tcm-primary shadow-sm' : 'text-purple-400 hover:text-purple-600'}`}
+          >
+            Clinic Account
+          </button>
+        </div>
+
+        <form onSubmit={authMode === 'firebase' ? handleEmailAuth : handleClinicLogin} className="space-y-4">
+          {authMode === 'firebase' ? (
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
+              <input 
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-purple-50/50 border border-purple-200 rounded-2xl py-4 pl-12 pr-4 text-purple-950 focus:border-tcm-primary focus:bg-white outline-none transition-all"
+                placeholder="Email Klinik"
+                required
+              />
+            </div>
+          ) : (
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
+              <input 
+                type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-purple-50/50 border border-purple-200 rounded-2xl py-4 pl-12 pr-4 text-purple-950 focus:border-tcm-primary focus:bg-white outline-none transition-all"
+                placeholder="Username Klinik"
+                required
+              />
+            </div>
+          )}
+          
           <div className="relative">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
             <input 
@@ -145,25 +196,29 @@ const LoginScreen: React.FC<Props> = ({ onLoginSuccess }) => {
             disabled={isLoading}
             className="w-full bg-tcm-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-purple-900/20 hover:brightness-110 active:scale-95 transition-all disabled:opacity-50"
           >
-             {isLoading ? 'MEMPROSES...' : isRegistering ? 'DAFTAR AKUN BARU' : 'MASUK SISTEM'}
+             {isLoading ? 'MEMPROSES...' : authMode === 'firebase' ? (isRegistering ? 'DAFTAR AKUN BARU' : 'MASUK SISTEM') : 'LOGIN KLINIK'}
           </button>
 
-          <button 
-            type="button"
-            onClick={() => setIsRegistering(!isRegistering)}
-            className="w-full text-[10px] font-black text-purple-400 uppercase tracking-widest hover:text-purple-600 transition-colors"
-          >
-            {isRegistering ? 'Sudah punya akun? Login di sini' : 'Belum punya akun? Daftar di sini'}
-          </button>
+          {authMode === 'firebase' && (
+            <button 
+              type="button"
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="w-full text-[10px] font-black text-purple-400 uppercase tracking-widest hover:text-purple-600 transition-colors"
+            >
+              {isRegistering ? 'Sudah punya akun? Login di sini' : 'Belum punya akun? Daftar di sini'}
+            </button>
+          )}
         </form>
 
         <div className="mt-8 pt-8 border-t border-purple-100">
-           <button 
-             onClick={handleGoogleLogin}
-             className="w-full flex items-center justify-center gap-2 py-4 bg-white border border-slate-200 text-slate-700 font-black rounded-2xl hover:bg-slate-50 transition-all shadow-sm mb-4"
-           >
-              <Chrome className="w-5 h-5 text-blue-500" /> LOGIN DENGAN GOOGLE
-           </button>
+           {authMode === 'firebase' && (
+             <button 
+               onClick={handleGoogleLogin}
+               className="w-full flex items-center justify-center gap-2 py-4 bg-white border border-slate-200 text-slate-700 font-black rounded-2xl hover:bg-slate-50 transition-all shadow-sm mb-4"
+             >
+                <Chrome className="w-5 h-5 text-blue-500" /> LOGIN DENGAN GOOGLE
+             </button>
+           )}
            <button 
              onClick={handleQuickAccess}
              className="w-full flex items-center justify-center gap-2 py-4 bg-purple-100 border border-purple-200 text-tcm-primary font-black rounded-2xl hover:bg-tcm-primary hover:text-white transition-all group"
